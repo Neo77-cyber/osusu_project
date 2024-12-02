@@ -10,6 +10,8 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from .serializers import CustomTokenObtainPairSerializer
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.views import APIView
+from django.db.models import Count
+
 
 
 
@@ -23,12 +25,43 @@ class UserRegistrationView(generics.CreateAPIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
 
+        # Add user to a group
+        group = self.get_or_create_group()
+        group.members.add(user)
+        group.save()
+
+        group_members = group.members.all()  
+        other_members = [{'id': member.id, 'username': member.username, 'email': member.email} for member in group_members]
+
+
         response_data = {
             'user': serializer.data,
-            'message': 'Registration successful. Please log in.'
+            'message': 'Registration successful. Please log in.',
+            'group': {
+                'name': group.name,
+                'other_members': other_members,
+                'is_full': group.members.count() >= 4
+            }
         }
-        
+
+        # Ensure a proper Response is returned
         return Response(response_data, status=201)
+
+    def get_or_create_group(self):
+        
+        
+        group = (
+            UserGroup.objects.annotate(member_count=Count('members'))
+            .filter(member_count__lt=4)
+            .first()
+        )
+
+        
+        if not group:
+            group_name = f"Group {UserGroup.objects.count() + 1}"
+            group = UserGroup.objects.create(name=group_name)
+
+        return group
     
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
@@ -47,3 +80,11 @@ class ChangePasswordView(APIView):
             user.save()
             return Response({'success': 'Password changed successfully'}, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+
+# Paymenet Gateway:
+
+
+
+
+

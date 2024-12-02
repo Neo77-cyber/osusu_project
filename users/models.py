@@ -3,6 +3,7 @@
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 import uuid
+from django.conf import settings
 
 
 class CustomUserManager(BaseUserManager):
@@ -35,3 +36,15 @@ class CustomUser(AbstractUser):
         return self.username
 
     objects = CustomUserManager()
+
+class UserGroup(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    members = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="custom_groups",)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+    @property
+    def is_full(self):
+        return self.members.count() >= 4
